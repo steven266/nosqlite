@@ -265,26 +265,50 @@ class Collection(object):
 
             # Standard
             elif value != document.get(field, None):
-                # check if field contains a dot
-                if '.' in field:
-                    nodes = field.split('.')
-                    document_section = document
-
-                    try:
-                        for path in nodes[:-1]:
-                            document_section = document_section.get(path, None)
-                    except AttributeError:
-                        document_section = None
-
-                    if document_section is None:
-                        matches.append(False)
-                    else:
-                        if value != document_section.get(nodes[-1], None):
-                            matches.append(False)
-                else:
+                if not self.__dot_check(field, value, document):
                     matches.append(False)
 
         return all(matches)
+
+    def __dot_check(self, field, value, document):
+        """
+        Returns true if the the given value has been found in the documents field.
+        This method allows to pass a field in dot-notation (e.g. x.y.z)
+        """
+
+        # check if field is not empty
+        if len(field) > 0:
+            nodes = field.split('.')
+            document_section = document
+            index = 0
+
+            try:
+                for path in nodes:
+                    index += len(path) + 1
+                    # if we encounter a list, iterate all items
+                    if type(document_section) is list:
+                        hit = False
+                        for item in document_section:
+                            # recursively explore the list
+                            item = item.get(path, None)
+                            hit = self.__dot_check(field[index:], value, item)
+                            if hit:
+                                return True
+                        if not hit:
+                            return False
+                    else:
+                        document_section = document_section.get(path, None)
+            except AttributeError:
+                document_section = None
+
+            document = document_section
+
+        # Do the final check
+        if document == value:
+            return True
+
+        return False
+
 
     def _get_operator_fn(self, op):
         """
